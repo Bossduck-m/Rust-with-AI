@@ -1,7 +1,10 @@
 [package]
-name = "xor_nn"
+name = "rust-with-my-ai"
 version = "0.1.0"
+authors = ["Bossduck-m"]
 edition = "2021"
+license = "MIT"
+description = "Sıfırdan Rust ile yazılmış, CNN ve Transformer destekli autograd kütüphanesi."
 
 [dependencies]
 rand = "0.8"
