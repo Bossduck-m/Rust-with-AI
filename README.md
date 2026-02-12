@@ -1,4 +1,4 @@
-# 🧠 Antigravity NN - Kendi Yapay Zekam Motoru (Rust)
+# 🧠 Rust-with-my-AI: Kendi Yapay Zekam Motoru
 
 Bu proje, Rust dilinde sıfırdan (sıfır bağımlılık prensibiyle) inşa edilmiş bir Sinir Ağı kütüphanesidir. Hem eğitim amaçlıdır hem de güçlü bir otograd (autograd) sistemi ile modern mimarileri (CNN, Transformers) destekleyecek şekilde tasarlanmıştır.
 
