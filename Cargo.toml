@@ -1,0 +1,11 @@
+[package]
+name = "rust-with-my-ai"
+version = "0.1.0"
+authors = ["Bossduck-m"]
+edition = "2021"
+license = "MIT"
+description = "Sıfırdan Rust ile yazılmış, CNN ve Transformer destekli autograd kütüphanesi."
+
+[dependencies]
+rand = "0.8"
+rand_distr = "0.4"
