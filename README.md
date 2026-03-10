@@ -1,43 +1,79 @@
-# 🧠 Rust-with-my-AI
+# Rust-with-my-AI
 
-> Experimental and educational project. It is not production-ready yet, APIs may change, and examples/tests are still being tightened.
+Experimental and educational neural network library written from scratch in Rust.
 
-Bu proje, Rust dilinde sıfırdan (sıfır bağımlılık prensibiyle) inşa edilmiş bir Sinir Ağı kütüphanesidir. Hem eğitim amaçlıdır hem de güçlü bir otograd (autograd) sistemi ile modern mimarileri (CNN, Transformers) destekleyecek şekilde tasarlanmıştır.
+This repository is aimed at learning and exploration, not production use. The core goal is to keep the mechanics visible: matrix ops, autograd, training loops, CNN blocks, and small Transformer-style components live in one place and can be read end to end.
 
-## 🚀 Özellikler
+## Status
 
-*   **Autograd Motoru**: Dinamik grafik tabanlı otomatik gradyan hesaplama.
-*   **Transformer Blokları**: Mini-GPT mimarisi için `MultiHeadAttention`, `PositionalEncoding` ve `Causal Masking`.
-*   **CNN Bileşenleri**: `Conv2D` (bias destekli), `MaxPooling` (tam backward destekli) ve `Flatten`.
-*   **Modern Katmanlar**: `LayerNorm`, `Residual` bağlantılar ve `Dropout`.
-*   **Optimizasyon**: `Adam` ve `SGD` optimizatörleri.
-*   **Aktivasyonlar**: `ReLU`, `Sigmoid`, `Softmax` (Auto-axis support) ve `Linear`.
+- Experimental
+- API may change without notice
+- Good fit for study, prototyping, and small toy experiments
+- Not positioned as a production ML framework
 
-## 🎭 TinyShakespeareGPT
+## What Is Included
 
-Proje içerisinde yer alan `TinyShakespeareGPT` modeli, karakter seviyesinde eğitilerek Shakespeare tarzında metin üretebilen otoregresif bir Transformer modelidir.
+- Dynamic autograd engine
+- Basic matrix operations
+- Dense layers and activations
+- Optimizers: `SGD`, `Adam`
+- CNN-oriented pieces such as `Conv2D`, `MaxPooling`, `Flatten`
+- Transformer-oriented pieces such as `MultiHeadAttention`, positional encoding, residual blocks, layer norm, dropout
+- A small character-level `TinyShakespeareGPT` example
 
-### Örnek Üretim:
-> **ROMEO:** Ohevehsthat unsatiathalatisis de death
+## Quick Start
 
-## 🛠️ Kurulum ve Test
+Prerequisite: a recent Rust toolchain with Cargo installed.
 
-Projeyi klonladıktan sonra Rust araç zinciriyle (Cargo) hemen test edebilirsiniz:
+Run the test suite:
 
 ```bash
-# GPT Modelini Test Et (Eğitim ve Üretim)
+cargo test
+```
+
+Run the XOR example:
+
+```bash
+cargo run --example xor
+```
+
+Run specific model-oriented tests with output:
+
+```bash
 cargo test test_tiny_shakespeare_gpt -- --nocapture
-
-# CNN (MNIST) Yapısını Test Et
 cargo test test_mnist_cnn -- --nocapture
-
-# Genel Bileşenleri Test Et
 cargo test test_modern_components -- --nocapture
 ```
 
-## 🏗️ Mimari Yaklaşım
+## Project Intent
 
-Kütüphane, **"Feature-First" (d_model, seq_len)** konvansiyonuna göre optimize edilmiştir. Bu sayede matris işlemleri Rust'ın hızını en verimli şekilde kullanır.
+This project is useful if you want to:
 
----
-*Bu proje, yapay zekanın "kalbine" inmek isteyenler için sıfırdan, her hücresi kontrol edilebilir bir altyapı sunar.*
+- inspect how backprop and parameter updates are wired together
+- experiment with small neural building blocks in plain Rust
+- learn by modifying a compact codebase instead of using a large framework
+
+This project is not trying to compete with mature ecosystems such as PyTorch, JAX, or production inference stacks.
+
+## Current Limitations
+
+- The code favors readability and experimentation over raw performance
+- Public API design is still fluid
+- Model coverage is intentionally small
+- Some examples and tests are toy-scale and intended as sanity checks, not benchmarks
+
+## Roadmap
+
+- Split the monolithic `src/lib.rs` into focused modules
+- Add more deterministic tests around training behavior
+- Improve documentation for tensor shapes and layer contracts
+- Add a few cleaner end-to-end examples beyond XOR
+- Reduce avoidable allocations and tighten hot paths
+
+## Architecture Notes
+
+The code follows a feature-first layout for several model components, especially around sequence-style operations. The implementation is intentionally explicit so the math path is easier to follow while debugging or studying.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
