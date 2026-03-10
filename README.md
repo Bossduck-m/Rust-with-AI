@@ -1,5 +1,7 @@
 # 🧠 Rust-with-my-AI
 
+> Experimental and educational project. It is not production-ready yet, APIs may change, and examples/tests are still being tightened.
+
 Bu proje, Rust dilinde sıfırdan (sıfır bağımlılık prensibiyle) inşa edilmiş bir Sinir Ağı kütüphanesidir. Hem eğitim amaçlıdır hem de güçlü bir otograd (autograd) sistemi ile modern mimarileri (CNN, Transformers) destekleyecek şekilde tasarlanmıştır.
 
 ## 🚀 Özellikler

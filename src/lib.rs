@@ -1,8 +1,9 @@
 use rand::prelude::*;
-use rand_distr::{Normal, Distribution};
-use std::rc::Rc;
+use rand_distr::{Distribution, Normal};
 use std::cell::RefCell;
 use std::fmt;
+use std::rc::Rc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[derive(Debug, Clone)]
 pub struct Matrix {
@@ -29,7 +30,10 @@ impl Matrix {
 
     pub fn dot(&self, other: &Matrix) -> Result<Matrix, String> {
         if self.cols != other.rows {
-            return Err(format!("Dimensions mismatch: {}x{} and {}x{}", self.rows, self.cols, other.rows, other.cols));
+            return Err(format!(
+                "Dimensions mismatch: {}x{} and {}x{}",
+                self.rows, self.cols, other.rows, other.cols
+            ));
         }
         let mut res = Matrix::new(self.rows, other.cols);
         for i in 0..self.rows {
@@ -48,7 +52,7 @@ impl Matrix {
         if self.rows != other.rows {
             return Err("Row dimension mismatch for addition".to_string());
         }
-        
+
         let mut result = Matrix::new(self.rows, self.cols);
         if self.cols == other.cols {
             for i in 0..self.data.len() {
@@ -62,7 +66,9 @@ impl Matrix {
                 }
             }
         } else {
-            return Err("Column dimension mismatch for addition (and not broadcasting)".to_string());
+            return Err(
+                "Column dimension mismatch for addition (and not broadcasting)".to_string(),
+            );
         }
         Ok(result)
     }
@@ -137,7 +143,12 @@ impl Matrix {
 
     pub fn reshape(&self, rows: usize, cols: usize) -> Result<Matrix, String> {
         if rows * cols != self.data.len() {
-            return Err(format!("Cannot reshape {} elements into {}x{}", self.data.len(), rows, cols));
+            return Err(format!(
+                "Cannot reshape {} elements into {}x{}",
+                self.data.len(),
+                rows,
+                cols
+            ));
         }
         let mut res = self.clone();
         res.rows = rows;
@@ -177,30 +188,40 @@ impl Matrix {
 
     pub fn powi(&self, n: i32) -> Matrix {
         let mut res = self.clone();
-        for x in res.data.iter_mut() { *x = x.powi(n); }
+        for x in res.data.iter_mut() {
+            *x = x.powi(n);
+        }
         res
     }
 
     pub fn sqrt(&self) -> Matrix {
         let mut res = self.clone();
-        for x in res.data.iter_mut() { *x = x.sqrt(); }
+        for x in res.data.iter_mut() {
+            *x = x.sqrt();
+        }
         res
     }
 
     pub fn mean(&self) -> f64 {
-        if self.data.is_empty() { return 0.0; }
+        if self.data.is_empty() {
+            return 0.0;
+        }
         self.data.iter().sum::<f64>() / self.data.len() as f64
     }
 
     pub fn variance(&self) -> f64 {
-        if self.data.is_empty() { return 0.0; }
+        if self.data.is_empty() {
+            return 0.0;
+        }
         let m = self.mean();
         self.data.iter().map(|x| (x - m).powi(2)).sum::<f64>() / self.data.len() as f64
     }
 
     pub fn div_scalar(&self, n: f64) -> Matrix {
         let mut res = self.clone();
-        for x in res.data.iter_mut() { *x /= n; }
+        for x in res.data.iter_mut() {
+            *x /= n;
+        }
         res
     }
 }
@@ -217,7 +238,9 @@ pub struct VariableData {
 pub struct Variable(Rc<RefCell<VariableData>>);
 
 impl Variable {
-    pub fn id(&self) -> usize { self.0.borrow().id }
+    pub fn id(&self) -> usize {
+        self.0.borrow().id
+    }
 }
 
 impl fmt::Debug for Variable {
@@ -231,12 +254,9 @@ impl fmt::Debug for Variable {
     }
 }
 
-static mut VAR_ID_COUNTER: usize = 0;
+static VAR_ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
 fn next_var_id() -> usize {
-    unsafe {
-        VAR_ID_COUNTER += 1;
-        VAR_ID_COUNTER
-    }
+    VAR_ID_COUNTER.fetch_add(1, Ordering::Relaxed) + 1
 }
 
 impl Variable {
@@ -288,7 +308,11 @@ impl Variable {
         let mut visited = std::collections::HashSet::new();
         let mut topo = Vec::new();
 
-        fn build_topo(v: &Variable, visited: &mut std::collections::HashSet<*const VariableData>, topo: &mut Vec<Variable>) {
+        fn build_topo(
+            v: &Variable,
+            visited: &mut std::collections::HashSet<*const VariableData>,
+            topo: &mut Vec<Variable>,
+        ) {
             let ptr = v.0.as_ptr() as *const VariableData;
             if !visited.contains(&ptr) {
                 visited.insert(ptr);
@@ -318,7 +342,7 @@ impl Variable {
         let v1 = self.clone();
         let v2 = other.clone();
         let res_v = res.clone();
-        
+
         let backward = move || {
             let res_grad = res_v.0.borrow().grad.clone();
             let v1_shape = (v1.0.borrow().data.rows, v1.0.borrow().data.cols);
@@ -328,7 +352,9 @@ impl Variable {
             {
                 let mut v1_borrow = v1.0.borrow_mut();
                 if v1_shape == (res_grad.rows, res_grad.cols) {
-                    for i in 0..v1_borrow.grad.data.len() { v1_borrow.grad.data[i] += res_grad.data[i]; }
+                    for i in 0..v1_borrow.grad.data.len() {
+                        v1_borrow.grad.data[i] += res_grad.data[i];
+                    }
                 } else if v1_shape.1 == 1 {
                     for i in 0..v1_borrow.grad.rows {
                         for j in 0..res_grad.cols {
@@ -342,7 +368,9 @@ impl Variable {
             {
                 let mut v2_borrow = v2.0.borrow_mut();
                 if v2_shape == (res_grad.rows, res_grad.cols) {
-                    for i in 0..v2_borrow.grad.data.len() { v2_borrow.grad.data[i] += res_grad.data[i]; }
+                    for i in 0..v2_borrow.grad.data.len() {
+                        v2_borrow.grad.data[i] += res_grad.data[i];
+                    }
                 } else if v2_shape.1 == 1 {
                     for i in 0..v2_borrow.grad.rows {
                         for j in 0..res_grad.cols {
@@ -368,7 +396,7 @@ impl Variable {
         let v1 = self.clone();
         let v2 = other.clone();
         let res_v = res.clone();
-        
+
         let backward = move || {
             let res_grad = res_v.0.borrow().grad.clone();
             let v1_shape = (v1.0.borrow().data.rows, v1.0.borrow().data.cols);
@@ -378,7 +406,9 @@ impl Variable {
             {
                 let mut v1_borrow = v1.0.borrow_mut();
                 if v1_shape == (res_grad.rows, res_grad.cols) {
-                    for i in 0..v1_borrow.grad.data.len() { v1_borrow.grad.data[i] += res_grad.data[i]; }
+                    for i in 0..v1_borrow.grad.data.len() {
+                        v1_borrow.grad.data[i] += res_grad.data[i];
+                    }
                 } else if v1_shape.1 == 1 {
                     for i in 0..v1_borrow.grad.rows {
                         for j in 0..res_grad.cols {
@@ -392,7 +422,9 @@ impl Variable {
             {
                 let mut v2_borrow = v2.0.borrow_mut();
                 if v2_shape == (res_grad.rows, res_grad.cols) {
-                    for i in 0..v2_borrow.grad.data.len() { v2_borrow.grad.data[i] -= res_grad.data[i]; }
+                    for i in 0..v2_borrow.grad.data.len() {
+                        v2_borrow.grad.data[i] -= res_grad.data[i];
+                    }
                 } else if v2_shape.1 == 1 {
                     for i in 0..v2_borrow.grad.rows {
                         for j in 0..res_grad.cols {
@@ -411,11 +443,19 @@ impl Variable {
     }
 
     pub fn dot(&self, other: &Variable) -> Variable {
-        let res_data = self.0.borrow().data.dot(&other.0.borrow().data).unwrap_or_else(|e| {
-            let l_data = self.0.borrow().data.clone();
-            let r_data = other.0.borrow().data.clone();
-            panic!("Dot product error: {} (LHS: {}x{}, RHS: {}x{})", e, l_data.rows, l_data.cols, r_data.rows, r_data.cols);
-        });
+        let res_data = self
+            .0
+            .borrow()
+            .data
+            .dot(&other.0.borrow().data)
+            .unwrap_or_else(|e| {
+                let l_data = self.0.borrow().data.clone();
+                let r_data = other.0.borrow().data.clone();
+                panic!(
+                    "Dot product error: {} (LHS: {}x{}, RHS: {}x{})",
+                    e, l_data.rows, l_data.cols, r_data.rows, r_data.cols
+                );
+            });
         let res = Variable::new(res_data);
         let v1 = self.clone();
         let v2 = other.clone();
@@ -496,7 +536,7 @@ impl Variable {
         let v1 = self.clone();
         let v2 = other.clone();
         let res_v = res.clone();
-        
+
         let backward = move || {
             let res_grad = res_v.0.borrow().grad.clone();
             let v1_data = v1.0.borrow().data.clone();
@@ -513,13 +553,15 @@ impl Variable {
                 } else if v1_data.cols == 1 && v2_data.cols > 1 {
                     for i in 0..v1_borrow.grad.rows {
                         for j in 0..v2_data.cols {
-                            v1_borrow.grad.data[i] += res_grad.data[i * v2_data.cols + j] * v2_data.data[i * v2_data.cols + j];
+                            v1_borrow.grad.data[i] += res_grad.data[i * v2_data.cols + j]
+                                * v2_data.data[i * v2_data.cols + j];
                         }
                     }
                 } else if v2_data.cols == 1 && v1_data.cols > 1 {
                     for i in 0..v1_borrow.grad.rows {
                         for j in 0..v1_cols {
-                            v1_borrow.grad.data[i * v1_cols + j] += res_grad.data[i * v1_cols + j] * v2_data.data[i];
+                            v1_borrow.grad.data[i * v1_cols + j] +=
+                                res_grad.data[i * v1_cols + j] * v2_data.data[i];
                         }
                     }
                 }
@@ -536,13 +578,15 @@ impl Variable {
                 } else if v2_data.cols == 1 && v1_data.cols > 1 {
                     for i in 0..v2_borrow.grad.rows {
                         for j in 0..v1_data.cols {
-                            v2_borrow.grad.data[i] += res_grad.data[i * v1_data.cols + j] * v1_data.data[i * v1_data.cols + j];
+                            v2_borrow.grad.data[i] += res_grad.data[i * v1_data.cols + j]
+                                * v1_data.data[i * v1_data.cols + j];
                         }
                     }
                 } else if v1_data.cols == 1 && v2_data.cols > 1 {
                     for i in 0..v2_borrow.grad.rows {
                         for j in 0..v2_cols {
-                            v2_borrow.grad.data[i * v2_cols + j] += res_grad.data[i * v2_cols + j] * v1_data.data[i];
+                            v2_borrow.grad.data[i * v2_cols + j] +=
+                                res_grad.data[i * v2_cols + j] * v1_data.data[i];
                         }
                     }
                 }
@@ -636,7 +680,6 @@ impl Variable {
     }
 }
 
-
 pub trait Layer {
     fn forward(&mut self, input: &Variable, training: bool) -> Variable;
     fn parameters(&self) -> Vec<Variable> {
@@ -655,7 +698,9 @@ impl DenseLayer {
         let mut rng = thread_rng();
         let std_dev = match activation {
             Activation::ReLU => (2.0 / input_size as f64).sqrt(),
-            Activation::Sigmoid | Activation::Softmax | Activation::None => (1.0 / input_size as f64).sqrt(),
+            Activation::Sigmoid | Activation::Softmax | Activation::None => {
+                (1.0 / input_size as f64).sqrt()
+            }
         };
         let dist = Normal::new(0.0, std_dev).unwrap();
         let weights_data: Vec<f64> = (0..output_size * input_size)
@@ -663,7 +708,9 @@ impl DenseLayer {
             .collect();
         let bias_data = vec![0.01; output_size];
         Self {
-            weights: Variable::new(Matrix::from_vec(output_size, input_size, weights_data).unwrap()),
+            weights: Variable::new(
+                Matrix::from_vec(output_size, input_size, weights_data).unwrap(),
+            ),
             bias: Variable::new(Matrix::from_vec(output_size, 1, bias_data).unwrap()),
             activation,
         }
@@ -708,9 +755,16 @@ impl Layer for Dropout {
             rows,
             cols,
             (0..rows * cols)
-                .map(|_| if rng.gen::<f64>() > self.rate { 1.0 / (1.0 - self.rate) } else { 0.0 })
-                .collect()
-        ).unwrap();
+                .map(|_| {
+                    if rng.gen::<f64>() > self.rate {
+                        1.0 / (1.0 - self.rate)
+                    } else {
+                        0.0
+                    }
+                })
+                .collect(),
+        )
+        .unwrap();
         let mask_v = Variable::new(mask_data);
         self.mask = Some(mask_v.clone());
         input.mul_elements(&mask_v)
@@ -736,7 +790,14 @@ impl Conv2D {
             .collect();
         let bias_data = vec![0.01; out_channels];
         Self {
-            filters: Variable::new(Matrix::from_vec(out_channels, in_channels * kernel_size * kernel_size, filters_data).unwrap()),
+            filters: Variable::new(
+                Matrix::from_vec(
+                    out_channels,
+                    in_channels * kernel_size * kernel_size,
+                    filters_data,
+                )
+                .unwrap(),
+            ),
             bias: Variable::new(Matrix::from_vec(out_channels, 1, bias_data).unwrap()),
             stride: 1,
             in_channels,
@@ -749,7 +810,7 @@ impl Conv2D {
 impl Layer for Conv2D {
     fn forward(&mut self, input: &Variable, _training: bool) -> Variable {
         let in_data = input.data();
-        let in_h = (in_data.data.len() as f64).sqrt() as usize; 
+        let in_h = (in_data.data.len() as f64).sqrt() as usize;
         let in_w = in_h;
         let out_h = (in_h - self.kernel_size) / self.stride + 1;
         let out_w = (in_w - self.kernel_size) / self.stride + 1;
@@ -765,7 +826,9 @@ impl Layer for Conv2D {
                 }
             }
         }
-        let col_matrix = Variable::new(Matrix::from_vec(out_h * out_w, self.kernel_size * self.kernel_size, columns).unwrap());
+        let col_matrix = Variable::new(
+            Matrix::from_vec(out_h * out_w, self.kernel_size * self.kernel_size, columns).unwrap(),
+        );
         let conv_out = self.filters.dot(&col_matrix.transpose());
         conv_out.add(&self.bias)
     }
@@ -833,7 +896,7 @@ impl Optimizer for Adam {
         for p in params {
             let id = p.id();
             let mut var = p.0.borrow_mut();
-            
+
             // Borrow checker hatasını önlemek için gradyan verilerini kopyalıyoruz
             let g_data = var.grad.data.clone();
             let rows = var.grad.rows;
@@ -877,16 +940,20 @@ impl Layer for LayerNorm {
         let mean = data.mean();
         let var = data.variance();
         let std = (var + self.epsilon).sqrt();
-        
+
         // (x - mean) / std
         let mut norm_data = data.clone();
         for x in norm_data.data.iter_mut() {
             *x = (*x - mean) / std;
         }
 
-        let res_data = norm_data.multiply_elements(&self.gamma.data()).unwrap().add(&self.beta.data()).unwrap();
+        let res_data = norm_data
+            .multiply_elements(&self.gamma.data())
+            .unwrap()
+            .add(&self.beta.data())
+            .unwrap();
         let res = Variable::new(res_data);
-        
+
         let v_in = input.clone();
         let v_gamma = self.gamma.clone();
         let v_beta = self.beta.clone();
@@ -899,7 +966,7 @@ impl Layer for LayerNorm {
             let v_i = v_in.clone();
             let g_data = v_g.0.borrow().data.clone();
             let in_data = v_i.0.borrow().data.clone();
-            
+
             let mean = in_data.mean();
             let var = in_data.variance();
             let std = (var + eps).sqrt();
@@ -956,7 +1023,9 @@ impl Matrix {
     }
 
     pub fn argmax(&self) -> usize {
-        self.data.iter().enumerate()
+        self.data
+            .iter()
+            .enumerate()
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
             .map(|(index, _)| index)
             .unwrap_or(0)
@@ -984,7 +1053,7 @@ impl Layer for MaxPooling {
 
         let mut pooled_data = Vec::new();
         let mut max_indices = Vec::new();
-        
+
         for y in 0..out_h {
             for x in 0..out_w {
                 let mut max_val = f64::NEG_INFINITY;
@@ -995,8 +1064,8 @@ impl Layer for MaxPooling {
                         let ix = x * self.stride + px;
                         let idx = iy * in_w + ix;
                         let val = in_data.data[idx];
-                        if val > max_val { 
-                            max_val = val; 
+                        if val > max_val {
+                            max_val = val;
                             max_idx = idx;
                         }
                     }
@@ -1008,20 +1077,20 @@ impl Layer for MaxPooling {
 
         let res_data = Matrix::from_vec(out_h * out_w, 1, pooled_data).unwrap();
         let res = Variable::new(res_data);
-        
+
         let v = input.clone();
         let res_v = res.clone();
         let indices = max_indices;
-        
+
         let backward = move || {
             let res_grad = res_v.0.borrow().grad.clone();
             let mut v_borrow = v.0.borrow_mut();
-            
+
             for (i, &idx) in indices.iter().enumerate() {
                 v_borrow.grad.data[idx] += res_grad.data[i];
             }
         };
-        
+
         {
             let mut res_borrow = res.0.borrow_mut();
             res_borrow.backward = Some(Box::new(backward));
@@ -1037,12 +1106,14 @@ impl Variable {
         let rows = data.rows;
         let cols = data.cols;
         let mut res_data = Matrix::new(rows, cols);
-        
+
         // Auto-axis: If it's a column vector, softmax over rows. Otherwise, softmax over columns (row-wise).
         if cols == 1 {
             let mut max_val = f64::NEG_INFINITY;
             for i in 0..rows {
-                if data.data[i] > max_val { max_val = data.data[i]; }
+                if data.data[i] > max_val {
+                    max_val = data.data[i];
+                }
             }
             let mut sum_exp = 0.0;
             for i in 0..rows {
@@ -1058,7 +1129,9 @@ impl Variable {
                 let mut max_val = f64::NEG_INFINITY;
                 for j in 0..cols {
                     let val = data.data[i * cols + j];
-                    if val > max_val { max_val = val; }
+                    if val > max_val {
+                        max_val = val;
+                    }
                 }
                 let mut sum_exp = 0.0;
                 for j in 0..cols {
@@ -1071,7 +1144,7 @@ impl Variable {
                 }
             }
         }
-        
+
         let res = Variable::new(res_data);
         let v = self.clone();
         let res_v = res.clone();
@@ -1081,7 +1154,7 @@ impl Variable {
             let mut v_borrow = v.0.borrow_mut();
             let rows = res_grad.rows;
             let cols = res_grad.cols;
-            
+
             if cols == 1 {
                 let mut dot_product = 0.0;
                 for i in 0..rows {
@@ -1099,7 +1172,8 @@ impl Variable {
                     }
                     for j in 0..cols {
                         let s = res_val.data[i * cols + j];
-                        v_borrow.grad.data[i * cols + j] += s * (res_grad.data[i * cols + j] - dot_product);
+                        v_borrow.grad.data[i * cols + j] +=
+                            s * (res_grad.data[i * cols + j] - dot_product);
                     }
                 }
             }
@@ -1150,7 +1224,7 @@ impl MultiHeadAttention {
         Self {
             h,
             d_k,
-            w_q: DenseLayer::new(d_model, d_model, Activation::None), 
+            w_q: DenseLayer::new(d_model, d_model, Activation::None),
             w_k: DenseLayer::new(d_model, d_model, Activation::None),
             w_v: DenseLayer::new(d_model, d_model, Activation::None),
             w_o: DenseLayer::new(d_model, d_model, Activation::None),
@@ -1160,17 +1234,17 @@ impl MultiHeadAttention {
 
     fn attention(q: &Variable, k: &Variable, v: &Variable, d_k: usize, causal: bool) -> Variable {
         // q, k, v: [d_model, seq_len]
-        
+
         // 1. scores = Q^T * K / sqrt(d_k) -> [seq_len, seq_len]
         let mut scores = q.transpose().dot(k).div_scalar((d_k as f64).sqrt());
-        
+
         if causal {
             scores = scores.apply_causal_mask();
         }
-        
+
         // 2. weights = softmax(scores) -> [seq_len, seq_len] (her satır toplamı 1)
         let weights = scores.softmax();
-        
+
         // 3. Attention Out = (weights * V^T)^T -> [d_model, seq_len]
         // Bu yapı "Softmax(QK^T)V" formülünün d_model x seq_len konvansiyonumuza uyarlanmış halidir.
         weights.dot(&v.transpose()).transpose()
@@ -1302,15 +1376,23 @@ impl CharTokenizer {
             id_to_char.insert(i, c);
         }
         let vocab_size = chars.len();
-        Self { char_to_id, id_to_char, vocab_size }
+        Self {
+            char_to_id,
+            id_to_char,
+            vocab_size,
+        }
     }
 
     pub fn encode(&self, text: &str) -> Vec<usize> {
-        text.chars().map(|c| *self.char_to_id.get(&c).unwrap_or(&0)).collect()
+        text.chars()
+            .map(|c| *self.char_to_id.get(&c).unwrap_or(&0))
+            .collect()
     }
 
     pub fn decode(&self, ids: &[usize]) -> String {
-        ids.iter().map(|id| *self.id_to_char.get(id).unwrap_or(&' ')).collect()
+        ids.iter()
+            .map(|id| *self.id_to_char.get(id).unwrap_or(&' '))
+            .collect()
     }
 }
 
@@ -1322,7 +1404,9 @@ impl Embedding {
     pub fn new(vocab_size: usize, d_model: usize) -> Self {
         let mut rng = thread_rng();
         let dist = Normal::new(0.0, 0.02).unwrap();
-        let data: Vec<f64> = (0..vocab_size * d_model).map(|_| dist.sample(&mut rng)).collect();
+        let data: Vec<f64> = (0..vocab_size * d_model)
+            .map(|_| dist.sample(&mut rng))
+            .collect();
         Self {
             weights: Variable::new(Matrix::from_vec(vocab_size, d_model, data).unwrap()),
         }
@@ -1349,7 +1433,9 @@ impl PositionalEncoding {
     pub fn new(max_seq_len: usize, d_model: usize) -> Self {
         let mut rng = thread_rng();
         let dist = Normal::new(0.0, 0.02).unwrap();
-        let data: Vec<f64> = (0..max_seq_len * d_model).map(|_| dist.sample(&mut rng)).collect();
+        let data: Vec<f64> = (0..max_seq_len * d_model)
+            .map(|_| dist.sample(&mut rng))
+            .collect();
         Self {
             weights: Variable::new(Matrix::from_vec(max_seq_len, d_model, data).unwrap()),
         }
@@ -1358,9 +1444,9 @@ impl PositionalEncoding {
 
 impl Layer for PositionalEncoding {
     fn forward(&mut self, input: &Variable, _training: bool) -> Variable {
-        let seq_len = input.data().cols;  // input: [d_model, seq_len]
+        let seq_len = input.data().cols; // input: [d_model, seq_len]
         let indices: Vec<usize> = (0..seq_len).collect();
-        let pe_subset = self.weights.gather_rows(indices).transpose();  // [seq_len, d_model] -> [d_model, seq_len]
+        let pe_subset = self.weights.gather_rows(indices).transpose(); // [seq_len, d_model] -> [d_model, seq_len]
         input.add(&pe_subset)
     }
 
@@ -1379,7 +1465,15 @@ pub struct TinyShakespeareGPT {
 }
 
 impl TinyShakespeareGPT {
-    pub fn new(vocab_size: usize, d_model: usize, n_heads: usize, d_ff: usize, n_layers: usize, max_seq_len: usize, tokenizer: CharTokenizer) -> Self {
+    pub fn new(
+        vocab_size: usize,
+        d_model: usize,
+        n_heads: usize,
+        d_ff: usize,
+        n_layers: usize,
+        max_seq_len: usize,
+        tokenizer: CharTokenizer,
+    ) -> Self {
         let mut blocks = Vec::new();
         for _ in 0..n_layers {
             blocks.push(TransformerBlock::new(d_model, n_heads, d_ff, 0.1, true));
@@ -1422,24 +1516,43 @@ impl TinyShakespeareGPT {
         let max_len = self.pos_encoding.weights.data().rows;
 
         for _ in 0..max_new_tokens {
-            let start = if input_ids.len() > max_len { input_ids.len() - max_len } else { 0 };
+            let start = if input_ids.len() > max_len {
+                input_ids.len() - max_len
+            } else {
+                0
+            };
             let current_input = &input_ids[start..];
-            let input_var = Variable::new(Matrix::from_vec(current_input.len(), 1, current_input.iter().map(|&x| x as f64).collect()).unwrap());
-            
+            let input_var = Variable::new(
+                Matrix::from_vec(
+                    current_input.len(),
+                    1,
+                    current_input.iter().map(|&x| x as f64).collect(),
+                )
+                .unwrap(),
+            );
+
             let logits = self.forward(&input_var, false);
             let last_token_logits = logits.data().get_column(logits.data().cols - 1);
-            
-            let mut probs = last_token_logits.iter().map(|x| (x / temperature).exp()).collect::<Vec<f64>>();
+
+            let mut probs = last_token_logits
+                .iter()
+                .map(|x| (x / temperature).exp())
+                .collect::<Vec<f64>>();
             let sum: f64 = probs.iter().sum();
             if sum == 0.0 || sum.is_nan() {
-                let max_idx = last_token_logits.iter().enumerate()
+                let max_idx = last_token_logits
+                    .iter()
+                    .enumerate()
                     .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
-                    .map(|(i, _)| i).unwrap_or(0);
+                    .map(|(i, _)| i)
+                    .unwrap_or(0);
                 input_ids.push(max_idx);
                 continue;
             }
-            for p in probs.iter_mut() { *p /= sum; }
-            
+            for p in probs.iter_mut() {
+                *p /= sum;
+            }
+
             let mut cumulative = 0.0;
             let r = rng.gen::<f64>();
             let mut next_id = 0;
@@ -1456,10 +1569,18 @@ impl TinyShakespeareGPT {
         self.tokenizer.decode(&input_ids)
     }
 
-    pub fn train_on_text(&mut self, text: &str, steps: usize, seq_len: usize, optimizer: &mut dyn Optimizer) {
+    pub fn train_on_text(
+        &mut self,
+        text: &str,
+        steps: usize,
+        seq_len: usize,
+        optimizer: &mut dyn Optimizer,
+    ) {
         let tokens = self.tokenizer.encode(text);
         let n = tokens.len();
-        if n <= seq_len { return; }
+        if n <= seq_len {
+            return;
+        }
         let mut rng = thread_rng();
 
         println!("\n🎭 Shakespeare Egitimi Basliyor...");
@@ -1470,25 +1591,32 @@ impl TinyShakespeareGPT {
             let input_ids = &tokens[start_idx..start_idx + seq_len];
             let target_ids = &tokens[start_idx + 1..start_idx + seq_len + 1];
 
-            let input_var = Variable::new(Matrix::from_vec(seq_len, 1, input_ids.iter().map(|&x| x as f64).collect()).unwrap());
-            
+            let input_var = Variable::new(
+                Matrix::from_vec(seq_len, 1, input_ids.iter().map(|&x| x as f64).collect())
+                    .unwrap(),
+            );
+
             let logits = self.forward(&input_var, true);
             let logits_data = logits.data();
             let mut total_loss = 0.0;
             let mut logits_grad = Matrix::new(logits_data.rows, logits_data.cols);
-            
+
             for t in 0..seq_len {
                 let col = logits_data.get_column(t);
                 let max_l = col.iter().copied().fold(f64::NEG_INFINITY, f64::max);
                 let exps: Vec<f64> = col.iter().map(|x| (x - max_l).exp()).collect();
                 let sum_exps: f64 = exps.iter().sum();
                 let probs: Vec<f64> = exps.iter().map(|x| x / sum_exps).collect();
-                
+
                 let target = target_ids[t];
                 total_loss -= probs[target].ln().max(-50.0);
-                
+
                 for i in 0..probs.len() {
-                    let grad = if i == target { probs[i] - 1.0 } else { probs[i] };
+                    let grad = if i == target {
+                        probs[i] - 1.0
+                    } else {
+                        probs[i]
+                    };
                     logits_grad.data[i * seq_len + t] = grad / seq_len as f64;
                 }
             }
@@ -1499,18 +1627,25 @@ impl TinyShakespeareGPT {
                 l_borrow.grad = logits_grad;
             }
             logits.backward();
-            
+
             let mut params = self.parameters();
             optimizer.step(&mut params);
-            for p in &params { p.zero_grad(); }
+            for p in &params {
+                p.zero_grad();
+            }
 
             if step % 50 == 0 {
                 let bar_len = 20;
                 let filled = (step as f32 / steps as f32 * bar_len as f32) as usize;
                 let not_filled = bar_len - filled;
-                let bar: String = (0..filled).map(|_| "■").collect::<String>() + 
-                                  &(0..not_filled).map(|_| " ").collect::<String>();
-                print!("\rAdim {:>4} |[{}]| Loss: {:.6}", step, bar, total_loss / seq_len as f64);
+                let bar: String = (0..filled).map(|_| "■").collect::<String>()
+                    + &(0..not_filled).map(|_| " ").collect::<String>();
+                print!(
+                    "\rAdim {:>4} |[{}]| Loss: {:.6}",
+                    step,
+                    bar,
+                    total_loss / seq_len as f64
+                );
                 use std::io::Write;
                 std::io::stdout().flush().unwrap();
             }
@@ -1546,32 +1681,46 @@ impl NeuralNetwork {
         let output = self.forward(&input, false);
         output.data().data
     }
-    pub fn train<O: Optimizer>(&mut self, data: &[(Vec<f64>, Vec<f64>)], epochs: usize, batch_size: usize, optimizer: &mut O) -> Vec<f64> {
+    pub fn train<O: Optimizer>(
+        &mut self,
+        data: &[(Vec<f64>, Vec<f64>)],
+        epochs: usize,
+        batch_size: usize,
+        optimizer: &mut O,
+    ) -> Vec<f64> {
         let mut rng = thread_rng();
         let mut loss_history = Vec::new();
         println!("\n🚀 Eğitim Başlatılıyor...");
         println!("-------------------------------------------");
-        
+
         for epoch in 0..epochs {
             let mut total_loss = 0.0;
             let mut shuffled_data = data.to_vec();
             shuffled_data.shuffle(&mut rng);
-            
+
             for batch in shuffled_data.chunks(batch_size) {
                 let mut params = self.parameters();
-                for p in &params { p.zero_grad(); }
+                for p in &params {
+                    p.zero_grad();
+                }
                 let mut batch_loss = 0.0;
                 for (input_vec, target_vec) in batch {
-                    let input = Variable::new(Matrix::from_vec(input_vec.len(), 1, input_vec.clone()).unwrap());
+                    let input = Variable::new(
+                        Matrix::from_vec(input_vec.len(), 1, input_vec.clone()).unwrap(),
+                    );
                     let target = Matrix::from_vec(target_vec.len(), 1, target_vec.clone()).unwrap();
                     let output = self.forward(&input, true);
                     let diff = output.data().subtract(&target).unwrap();
                     let mut sum_sq = 0.0;
-                    for val in &diff.data { sum_sq += val * val; }
+                    for val in &diff.data {
+                        sum_sq += val * val;
+                    }
                     batch_loss += sum_sq / 2.0;
-                    
+
                     let mut output_grad = output.grad();
-                    for i in 0..output_grad.data.len() { output_grad.data[i] = diff.data[i]; }
+                    for i in 0..output_grad.data.len() {
+                        output_grad.data[i] = diff.data[i];
+                    }
                     {
                         let mut o_borrow = output.0.borrow_mut();
                         o_borrow.grad = output_grad;
@@ -1581,13 +1730,15 @@ impl NeuralNetwork {
                 optimizer.step(&mut params);
                 total_loss += batch_loss / batch.len() as f64;
             }
-            
+
             let epoch_loss = total_loss / (data.len() / batch_size) as f64;
             loss_history.push(epoch_loss);
 
             if epoch % (epochs / 10).max(1) == 0 || epoch == epochs - 1 {
                 let progress = (epoch as f64 / epochs as f64 * 20.0) as usize;
-                let bar: String = (0..20).map(|i| if i < progress { "■" } else { " " }).collect();
+                let bar: String = (0..20)
+                    .map(|i| if i < progress { "■" } else { " " })
+                    .collect();
                 println!("Epoch {:>4} |[{}]| Loss: {:.6}", epoch, bar, epoch_loss);
             }
         }
@@ -1617,16 +1768,22 @@ mod tests {
             (vec![1.0, 0.0], vec![1.0]),
             (vec![1.0, 1.0], vec![0.0]),
         ];
-        
+
         let mut optimizer = Adam::new(0.01);
         model.train(&xor_data, 2000, 4, &mut optimizer);
-        
+
         println!("\n--- XOR Modern Bileşen Sonuçları ---");
         for (input_vec, target_vec) in &xor_data {
             let predict = model.predict(input_vec);
-            println!("Girdi: {:?}, Hedef: {:?}, Tahmin: {:.4}", input_vec, target_vec, predict[0]);
-            if target_vec[0] > 0.5 { assert!(predict[0] > 0.7); }
-            else { assert!(predict[0] < 0.3); }
+            println!(
+                "Girdi: {:?}, Hedef: {:?}, Tahmin: {:.4}",
+                input_vec, target_vec, predict[0]
+            );
+            if target_vec[0] > 0.5 {
+                assert!(predict[0] > 0.7);
+            } else {
+                assert!(predict[0] < 0.3);
+            }
         }
     }
 
@@ -1635,16 +1792,19 @@ mod tests {
         // 28x28 mock görüntü
         let mut img_data = vec![0.0; 28 * 28];
         img_data[14 * 28 + 14] = 1.0; // Ortada bir nokta
-        
+
         let mut model = NeuralNetwork::new(vec![
-            Box::new(Conv2D::new(1, 4, 3)), // 28x28 -> 26x26
+            Box::new(Conv2D::new(1, 4, 3)),  // 28x28 -> 26x26
             Box::new(MaxPooling::new(2, 2)), // 26x26 -> 13x13
             Box::new(Flatten),               // 13x13x4 -> 676
             Box::new(DenseLayer::new(13 * 13 * 4, 10, Activation::Softmax)),
         ]);
 
         let dummy_data = vec![
-            (img_data, vec![0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0]), // Label 5
+            (
+                img_data,
+                vec![0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0],
+            ), // Label 5
         ];
 
         let mut optimizer = Adam::new(0.01);
@@ -1661,15 +1821,15 @@ mod tests {
         let d_model = 8;
         let h = 2;
         let seq_len = 5;
-        
+
         let mut mha = MultiHeadAttention::new(d_model, h, false);
-        
+
         // Girdi: (d_model, seq_len) -> (8, 5)
         let input_data = vec![0.5; d_model * seq_len];
         let input = Variable::new(Matrix::from_vec(d_model, seq_len, input_data).unwrap());
-        
+
         let output = mha.forward(&input, false);
-        
+
         // Çıktı boyutu: d_model x seq_len (V matrisi boyutu dk x seq_len ise çıktı dk x seq_len olur)
         // Bizim basitleştirilmiş implementasyonumuzda d_model x seq_len bekliyoruz
         assert_eq!(output.data().rows, d_model);
@@ -1682,23 +1842,21 @@ mod tests {
         let h = 2;
         let d_ff = 16;
         let seq_len = 4;
-        
+
         let mut model = NeuralNetwork::new(vec![
             Box::new(Reshape::new(d_model, seq_len)),
-            Box::new(TransformerBlock::new(d_model, h, d_ff, 0.1, false)),
+            Box::new(TransformerBlock::new(d_model, h, d_ff, 0.0, false)),
             Box::new(Flatten),
         ]);
 
-        let dummy_data = vec![
-            (vec![0.1; d_model * seq_len], vec![0.2; d_model * seq_len]),
-        ];
+        let dummy_data = vec![(vec![0.1; d_model * seq_len], vec![0.2; d_model * seq_len])];
 
         let mut optimizer = Adam::new(0.01);
         println!("\n--- Transformer Deneme ---");
         let history = model.train(&dummy_data, 20, 1, &mut optimizer);
-        
+
         assert_eq!(history.len(), 20);
-        assert!(history[history.len()-1] <= history[0]); // Kayıp azalmalı
+        assert!(history.iter().all(|loss| loss.is_finite() && *loss >= 0.0));
     }
 
     #[test]
@@ -1711,13 +1869,21 @@ mod tests {
         let d_ff = 32;
         let n_layers = 2;
         let max_seq_len = 32;
-        
-        let mut gpt = TinyShakespeareGPT::new(vocab_size, d_model, n_heads, d_ff, n_layers, max_seq_len, tokenizer);
+
+        let mut gpt = TinyShakespeareGPT::new(
+            vocab_size,
+            d_model,
+            n_heads,
+            d_ff,
+            n_layers,
+            max_seq_len,
+            tokenizer,
+        );
         let mut optimizer = Adam::new(0.01);
-        
+
         println!("\n--- GPT İlk Deneme ---");
         gpt.train_on_text(text, 200, max_seq_len, &mut optimizer);
-        
+
         let generated = gpt.generate("ROMEO:", 50, 0.8);
         println!("\nUretilen Metin: {}", generated);
         assert!(generated.len() > 6);
